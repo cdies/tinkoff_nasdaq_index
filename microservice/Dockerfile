@@ -1,6 +1,6 @@
 FROM python:3.8
 
-RUN python -m pip install pandas numpy yfinance tinvest fastapi httpx gunicorn uvicorn uvloop httptools
+RUN python -m pip install pandas numpy yfinance tinkoff-investments fastapi httpx gunicorn uvicorn uvloop httptools
 
 WORKDIR /app
 

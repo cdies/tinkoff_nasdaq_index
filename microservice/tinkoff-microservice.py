@@ -6,7 +6,7 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-import tinvest
+from tinkoff.invest import Client, CandleInterval
 import yfinance as yf
 
 from custom_index import CustomIndex
@@ -100,5 +100,3 @@ def currient_candle():
     
     
     return ci.last_candle.to_json()
-
-

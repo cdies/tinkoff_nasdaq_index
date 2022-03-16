@@ -6,7 +6,7 @@ import httpx
 import logging
 import sys
 
-import tinvest
+from tinkoff.invest import Client, CandleInterval
 import yfinance as yf
 
 import warnings
@@ -18,11 +18,9 @@ class CustomIndex:
     def __init__(self, token='token.txt'):
         self.logger = self.__create_logger()
 
-        self.q_tokens = deque()
         try:
             with open(token, 'r') as file:
-                for line in file:
-                    self.q_tokens.append(line.rstrip())
+                self.__token = file.read().rstrip()
         except Exception as e:
             self.logger.exception(e)
             raise Exception('--> Ошибка в файле token.txt: '+ str(e))
@@ -46,10 +44,12 @@ class CustomIndex:
         df['portion'] = df['portion'].str[:-1]
         df['portion'] = df['portion'].str.replace(',', '.').astype(float)
 
-        client = self.__get_tinkoff_client()
 
         try:
-            all_stocks = pd.DataFrame.from_dict(client.get_market_stocks().dict()['payload']['instruments'])
+            with Client(self.__token) as client:
+                shares = client.instruments.shares()
+
+            all_stocks = pd.DataFrame(shares.instruments)
         except Exception as e:
             self.logger.exception(e)
             raise Exception('--> tinkoff api - Ошибка загрузки данных обо всех акциях.')
@@ -74,7 +74,7 @@ class CustomIndex:
             test = df_yahoo[df_yahoo['name'].str.contains(row['Company'])].copy()
             if len(test) != 0:
                 test['ticker'] = row['Ticker']
-                temp = temp.append(test)
+                temp = pd.concat([temp, test])
         
         df_yahoo = temp.drop_duplicates()
         
@@ -83,6 +83,13 @@ class CustomIndex:
         
         df_yahoo['last_price'] = -1
         self.df_yahoo = df_yahoo
+
+
+    def units_nano_convert(self, d):
+        price = '{}.{}'.format(d['units'], d['nano'])
+        price = float(price)
+        
+        return price
 
 
     def round_to_5min(self, t):
@@ -112,19 +119,7 @@ class CustomIndex:
         return logger
 
 
-    def __get_tinkoff_client(self):
-        self.q_tokens
-
-        # Смена токена
-        token = self.q_tokens.popleft()
-        self.q_tokens.append(token)
-
-        return tinvest.SyncClient(token)
-
-
     def get_tinkoff_candles(self, figi, days=1):
-        client = self.__get_tinkoff_client()
-
         curr_time = datetime.now()
 
         data = []
@@ -136,28 +131,29 @@ class CustomIndex:
 
         for day in range(days):
             try:
-                data += client.get_market_candles(
-                    figi=figi,
-                    from_=curr_time - timedelta(days=day+1),
-                    to=curr_time - timedelta(days=day),
-                    interval=tinvest.CandleResolution.min5
-                    ).dict()['payload']['candles']
+                with Client(self.__token) as client:
+                    data += client.market_data.get_candles(
+                        figi=figi,
+                        from_=curr_time - timedelta(days=day+1),
+                        to=curr_time - timedelta(days=day),
+                        interval=CandleInterval.CANDLE_INTERVAL_5_MIN
+                    ).candles
             except Exception as e:
                 self.logger.exception(e)
                 raise Exception('--> tinkoff api - history - Ошибка загрузки исторических данных.')
 
 
-        candles = pd.DataFrame.from_dict(data)
-        candles = candles.rename(columns={'o': 'open', 'h': 'high',
-                                        'l': 'low', 'c': 'close'})
+        candles = pd.DataFrame(data)
+
+        for col in ['open', 'high', 'low', 'close']:
+            candles[col] = candles[col].apply(self.units_nano_convert)
 
         candles = candles[['time', 'open', 'high', 'low', 'close']]
-        
+
         candles['time'] = candles['time'].dt.tz_convert('Europe/Moscow')
         candles.set_index('time', inplace=True)
 
-        for col in ['open', 'high', 'low', 'close']:
-            candles[col] = candles[col].astype(float, copy=False)
+        candles = candles.drop_duplicates()
     
         return candles
 
@@ -217,17 +213,18 @@ class CustomIndex:
 
 
     def __get_tinkoff_last_price(self, figi):
-        client = self.__get_tinkoff_client()
-
         try:
-            price = client.get_market_orderbook(figi=figi, depth=1)
+            with Client(self.__token) as client:
+                last_prices = client.market_data.get_last_prices(figi=figi)
         except Exception as e:
             self.logger.exception(e)
             raise Exception('--> tinkoff api - last price - Ошибка загрузки последней цены.')
 
-        price = price.dict()['payload']['last_price']
+        last_prices = pd.DataFrame(last_prices.last_prices)
 
-        return float(price)
+        last_prices['price'] = last_prices['price'].apply(self.units_nano_convert)
+
+        return last_prices
 
 
     def __get_yahoo_last_price(self, ticker):
@@ -264,9 +261,11 @@ class CustomIndex:
 
     def get_last_price(self):
         last_price = 0
-        
-        for _, row in self.df.iterrows():
-            last_price += self.__get_tinkoff_last_price(row['figi']) * row['portion']
+
+        t_l_p = self.__get_tinkoff_last_price(self.df['figi'].to_list())
+        t_l_p = t_l_p.merge(self.df, on='figi')
+
+        last_price += np.sum(t_l_p['price'] * t_l_p['portion'])
 
 
         ## Не стоит добавлять данные из yahoo api, хоть мне и не удалось спарсить
