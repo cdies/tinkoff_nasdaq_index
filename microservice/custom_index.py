@@ -5,6 +5,7 @@ from collections import defaultdict, deque
 import httpx
 import logging
 import sys
+from decimal import Decimal
 
 from tinkoff.invest import Client, CandleInterval
 import yfinance as yf
@@ -86,8 +87,9 @@ class CustomIndex:
 
 
     def units_nano_convert(self, d):
-        price = '{}.{}'.format(d['units'], d['nano'])
-        price = float(price)
+        # https://github.com/Tinkoff/invest-python/issues/45
+        nano = d['nano'] / Decimal("10e8")
+        price = d['units'] + float(nano)
         
         return price
 
