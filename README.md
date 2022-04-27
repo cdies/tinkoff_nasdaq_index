@@ -1,6 +1,6 @@
 https://habr.com/ru/post/651241/
 
-Update: теперь на новом [api](https://github.com/Tinkoff/invest-python) (нужен только один [токен](https://tinkoff.ru/sl/kBcgI5N09V))
+Update: теперь на новом [api](https://github.com/Tinkoff/invest-python) (нужен только один токен)
 
 # Индекс чистой стоимости фонда Тинькофф NASDAQ
 
