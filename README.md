@@ -25,3 +25,8 @@ Update: теперь на новом [api](https://github.com/Tinkoff/invest-pyt
 В консоле браузера можно отслеживать количество ошибок. Если их очень много, то можно увеличить интервал в файле `index.js`. На небольшое количество ошибок можно не обращать внимания.
 
 ![](https://habrastorage.org/webt/e9/q_/pj/e9q_pjzclpzz9imf7m-7wpompzu.png)
+
+
+<br/><br/>
+---
+[![](https://habrastorage.org/webt/gz/gc/i6/gzgci6pivvdnk-gmj-kepml5q9y.gif)](https://yoomoney.ru/to/4100117863420642)
