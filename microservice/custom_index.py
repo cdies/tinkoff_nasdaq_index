@@ -68,7 +68,7 @@ class CustomIndex:
             self.logger.exception(e)
             raise Exception('--> (www.wikipedia.org) - Ошибка загрузки тикетов Nasdaq.')
 
-        df_nasdaq = table[3]
+        df_nasdaq = table[4]
         
         temp = pd.DataFrame()
         for _, row in df_nasdaq.iterrows():
